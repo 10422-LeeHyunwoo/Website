@@ -2,7 +2,6 @@ import streamlit as st
 import random
 import copy
 
-# 스도쿠 유효성 검사 함수
 def is_valid(board, row, col, num):
     for i in range(9):
         if board[row][i] == num or board[i][col] == num:
@@ -14,54 +13,67 @@ def is_valid(board, row, col, num):
                 return False
     return True
 
-# 스도쿠 퍼즐 해결 함수
-def solve(board):
+def solve_count(board, count=0):
     for row in range(9):
         for col in range(9):
             if board[row][col] == 0:
                 for num in range(1, 10):
                     if is_valid(board, row, col, num):
                         board[row][col] = num
-                        if solve(board):
+                        count = solve_count(board, count)
+                        if count > 1:
+                            return count
+                        board[row][col] = 0
+                return count
+    return count + 1
+
+def generate_full_board():
+    board = [[0 for _ in range(9)] for _ in range(9)]
+    def fill():
+        for i in range(81):
+            row, col = divmod(i, 9)
+            if board[row][col] == 0:
+                nums = list(range(1, 10))
+                random.shuffle(nums)
+                for num in nums:
+                    if is_valid(board, row, col, num):
+                        board[row][col] = num
+                        if fill():
                             return True
                         board[row][col] = 0
                 return False
-    return True
+        return True
+    fill()
+    return board
 
-# 스도쿠 퍼즐 생성 함수
-def generate_puzzle():
-    board = [[0 for _ in range(9)] for _ in range(9)]
-    filled = 0
-    while filled < 17:
-        row, col = random.randint(0, 8), random.randint(0, 8)
-        if board[row][col] == 0:
-            num = random.randint(1, 9)
-            if is_valid(board, row, col, num):
-                board[row][col] = num
-                filled += 1
-    solution = copy.deepcopy(board)
-    solve(solution)
-    return board, solution
+def generate_unique_puzzle():
+    board = generate_full_board()
+    puzzle = copy.deepcopy(board)
+    cells = [(i, j) for i in range(9) for j in range(9)]
+    random.shuffle(cells)
 
-# 퍼즐 상태 초기화
-def reset_puzzle():
-    puzzle, solution = generate_puzzle()
-    st.session_state["puzzle"] = puzzle
-    st.session_state["solution"] = solution
-    st.session_state["new_game"] = False
+    for row, col in cells:
+        temp = puzzle[row][col]
+        puzzle[row][col] = 0
+        board_copy = copy.deepcopy(puzzle)
+        if solve_count(board_copy) != 1:
+            puzzle[row][col] = temp  # 해답이 2개 이상이면 복원
 
-# 상태 초기화 또는 새 게임
-if "puzzle" not in st.session_state or st.session_state.get("new_game", False):
-    reset_puzzle()
+    return puzzle, board
 
-st.title("🧩 스도쿠 게임")
-st.markdown("빈 칸에 1~9 사이 숫자를 입력하세요.")
+# 초기화
+if "puzzle" not in st.session_state:
+    puzzle, solution = generate_unique_puzzle()
+    st.session_state.puzzle = puzzle
+    st.session_state.solution = solution
 
-puzzle = st.session_state["puzzle"]
-solution = st.session_state["solution"]
-user_grid = []
+st.title("🧠 단일 해답 스도쿠")
+st.write("빈 칸에 숫자를 입력하고 정답을 맞춰보세요!")
 
-# 사용자 입력 그리드 생성
+puzzle = st.session_state.puzzle
+solution = st.session_state.solution
+user_input = []
+
 for i in range(9):
     cols = st.columns(9)
     row = []
@@ -71,30 +83,30 @@ for i in range(9):
             cols[j].markdown(f"**{puzzle[i][j]}**")
             row.append(puzzle[i][j])
         else:
-            value = cols[j].text_input("", max_chars=1, key=key)
+            val = cols[j].text_input("", max_chars=1, key=key)
             try:
-                num = int(value)
+                num = int(val)
                 if 1 <= num <= 9:
                     row.append(num)
                 else:
                     row.append(0)
             except:
                 row.append(0)
-    user_grid.append(row)
+    user_input.append(row)
 
-# 정답 확인
 if st.button("✅ 정답 확인"):
-    correct = True
-    for i in range(9):
-        for j in range(9):
-            if puzzle[i][j] == 0 and user_grid[i][j] != solution[i][j]:
-                correct = False
+    correct = all(
+        user_input[i][j] == solution[i][j]
+        if puzzle[i][j] == 0 else True
+        for i in range(9) for j in range(9)
+    )
     if correct:
-        st.success("🎉 정답입니다! 완벽해요!")
+        st.success("🎉 정답입니다! 완벽히 해결했어요.")
     else:
-        st.warning("😕 틀린 칸이 있어요. 다시 확인해보세요.")
+        st.error("❌ 틀린 칸이 있어요. 다시 확인해보세요.")
 
-# 새 게임
-if st.button("🔄 새 퍼즐 시작"):
-    st.session_state["new_game"] = True
-    st.info("새 퍼즐이 준비됐습니다. 페이지를 새로고침(F5) 해주세요.")
+if st.button("🔄 새 퍼즐"):
+    puzzle, solution = generate_unique_puzzle()
+    st.session_state.puzzle = puzzle
+    st.session_state.solution = solution
+    st.experimental_rerun()
