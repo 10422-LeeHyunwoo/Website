@@ -106,7 +106,5 @@ if st.button("✅ 정답 확인"):
         st.error("❌ 틀린 칸이 있어요. 다시 확인해보세요.")
 
 if st.button("🔄 새 퍼즐"):
-    puzzle, solution = generate_unique_puzzle()
-    st.session_state.puzzle = puzzle
-    st.session_state.solution = solution
-    st.experimental_rerun()
+    st.session_state.clear()
+    st.info("✅ 새 퍼즐이 준비되었습니다. 페이지를 새로고침(F5 또는 Ctrl+R) 해주세요.")
